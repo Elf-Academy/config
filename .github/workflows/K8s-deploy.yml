@@ -1,0 +1,42 @@
+name: K8s Deploy
+
+on:
+  workflow_call:
+    inputs:
+      deployment:       # k8s Deployment name
+        required: true
+        type: string
+      namespace:
+        required: false
+        type: string
+        default: default
+      wait_seconds:     # how long to wait for rollout
+        required: false
+        type: number
+        default: 300
+
+jobs:
+  restart-k8s-container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          kubectl version --client
+          kubectl get ns
+
+      - name: Restart deployment
+        shell: bash
+        run: |
+          kubectl -n "${{ inputs.namespace }}" rollout restart deployment/${{ inputs.deployment }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n "${{ inputs.namespace }}" rollout status deployment/${{ inputs.deployment }} 
